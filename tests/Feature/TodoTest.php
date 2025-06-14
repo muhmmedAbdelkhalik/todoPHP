@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
+use Illuminate\Support\Facades\DB;
 
 class TodoTest extends TestCase
 {
@@ -35,13 +36,17 @@ class TodoTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonStructure([
-                'id',
-                'title',
-                'description',
-                'user_id',
-                'status',
-                'created_at',
-                'updated_at',
+                'success',
+                'message',
+                'data' => [
+                    'id',
+                    'title',
+                    'description',
+                    'user_id',
+                    'status',
+                    'created_at',
+                    'updated_at',
+                ],
             ]);
 
         $this->assertDatabaseHas('todos', [
@@ -62,14 +67,18 @@ class TodoTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'data',
-                'page',
-                'limit',
-                'total',
-                'filters',
+                'success',
+                'message',
+                'data' => [
+                    'items',
+                    'page',
+                    'limit',
+                    'total',
+                    'filters',
+                ],
             ]);
 
-        $this->assertCount(3, $response->json('data'));
+        $this->assertCount(3, $response->json('data.items'));
     }
 
     public function test_user_can_update_their_todo(): void
@@ -86,8 +95,13 @@ class TodoTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'title' => $updateData['title'],
-                'description' => $updateData['description'],
+                'success' => true,
+                'message' => 'Todo updated successfully.',
+                'data' => [
+                    'id' => $todo->id,
+                    'title' => $updateData['title'],
+                    'description' => $updateData['description'],
+                ],
             ]);
 
         $this->assertDatabaseHas('todos', [
@@ -108,7 +122,11 @@ class TodoTest extends TestCase
                 'description' => 'Updated Description',
             ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Forbidden',
+            ]);
     }
 
     public function test_user_can_delete_their_todo(): void
@@ -118,8 +136,20 @@ class TodoTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->deleteJson("/api/todos/{$todo->id}");
 
-        $response->assertStatus(204);
-        $this->assertDatabaseMissing('todos', ['id' => $todo->id]);
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Todo deleted successfully.',
+                'data' => null,
+            ]);
+        $this->assertDatabaseHas('todos', [
+            'id' => $todo->id,
+            // deleted_at should not be null
+        ]);
+        $this->assertNotNull(
+            DB::table('todos')->where('id', $todo->id)->value('deleted_at'),
+            'Todo should be soft deleted (deleted_at is not null)'
+        );
     }
 
     public function test_user_cannot_delete_other_users_todo(): void
@@ -130,7 +160,11 @@ class TodoTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->deleteJson("/api/todos/{$todo->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Forbidden',
+            ]);
     }
 
     public function test_todo_list_supports_filtering_and_sorting(): void
@@ -151,13 +185,17 @@ class TodoTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'filters' => [
-                    'status' => 'completed',
-                    'sort_by' => 'title',
-                    'sort_order' => 'asc',
+                'success' => true,
+                'message' => 'Todos fetched successfully.',
+                'data' => [
+                    'filters' => [
+                        'status' => 'completed',
+                        'sort_by' => 'title',
+                        'sort_order' => 'asc',
+                    ],
                 ],
             ]);
 
-        $this->assertCount(1, $response->json('data'));
+        $this->assertCount(1, $response->json('data.items'));
     }
 } 

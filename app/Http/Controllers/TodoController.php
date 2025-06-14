@@ -6,9 +6,19 @@ use App\Models\Todo;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use App\Http\Requests\StoreTodoRequest;
+use App\Http\Requests\UpdateTodoRequest;
+use App\Services\TodoService;
 
 class TodoController extends Controller
 {
+    protected TodoService $todoService;
+
+    public function __construct(TodoService $todoService)
+    {
+        $this->todoService = $todoService;
+    }
+
     public function index(Request $request): JsonResponse
     {
         $limit = $request->input('limit', 10);
@@ -41,8 +51,8 @@ class TodoController extends Controller
         $todos = $query->orderBy($sortBy, $sortOrder)
             ->paginate($limit, ['*'], 'page', $page);
 
-        return response()->json([
-            'data' => $todos->items(),
+        $data = [
+            'items' => $todos->items(),
             'page' => $todos->currentPage(),
             'limit' => $todos->perPage(),
             'total' => $todos->total(),
@@ -52,58 +62,34 @@ class TodoController extends Controller
                 'sort_by' => $sortBy,
                 'sort_order' => $sortOrder,
             ],
-        ]);
+        ];
+
+        return apiResponse($data, 'Todos fetched successfully.');
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreTodoRequest $request): JsonResponse
     {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-        ]);
-
-        $todo = Todo::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'user_id' => $request->user()->id,
-            'status' => 'pending', // default status
-        ]);
-
-        // Return all fields, including status
-        return response()->json($todo->fresh(), 201);
+        $validated = $request->validated();
+        $todo = $this->todoService->create($validated, $request->user());
+        return apiResponse($todo->fresh(), 'Todo created successfully.', true, 201);
     }
 
-    public function update(Request $request, Todo $todo): JsonResponse
+    public function update(UpdateTodoRequest $request, Todo $todo): JsonResponse
     {
-        // Check if the user owns the todo
         if ($todo->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Forbidden'
-            ], Response::HTTP_FORBIDDEN);
+            return apiResponse(null, 'Forbidden', false, Response::HTTP_FORBIDDEN);
         }
-
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-        ]);
-
-        $todo->update([
-            'title' => $request->title,
-            'description' => $request->description,
-        ]);
-
-        return response()->json($todo);
+        $validated = $request->validated();
+        $todo = $this->todoService->update($todo, $validated);
+        return apiResponse($todo, 'Todo updated successfully.');
     }
 
-    public function destroy(Request $request, Todo $todo): Response
+    public function destroy(Request $request, Todo $todo): JsonResponse
     {
-        // Check if the user owns the todo
         if ($todo->user_id !== $request->user()->id) {
-            return response(null, Response::HTTP_FORBIDDEN);
+            return apiResponse(null, 'Forbidden', false, Response::HTTP_FORBIDDEN);
         }
-
-        $todo->delete();
-
-        return response()->noContent();
+        $this->todoService->delete($todo);
+        return apiResponse(null, 'Todo deleted successfully.', true, 200);
     }
 } 
