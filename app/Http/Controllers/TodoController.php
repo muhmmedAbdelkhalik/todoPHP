@@ -92,5 +92,26 @@ class TodoController extends Controller
         $this->todoService->delete($todo);
         return apiResponse(null, 'Todo deleted successfully.', true, 200);
     }
-    
+    /**
+     * Demonstrates a performance issue: N+1 query.
+     *
+     * @return JsonResponse
+     */
+    public function nPlusOneExample(): JsonResponse
+    {
+        // Assume each Todo has an associated User (creator)
+        $todos = \App\Models\Todo::all();
+
+        $result = [];
+        foreach ($todos as $todo) {
+            // This will cause a query per todo if 'user' is not eager loaded (N+1)
+            $result[] = [
+                'id' => $todo->id,
+                'title' => $todo->title,
+                'user_name' => $todo->user ? $todo->user->name : null,
+            ];
+        }
+
+        return apiResponse($result, 'Todos with user names (N+1 query issue present).');
+    }
 } 
