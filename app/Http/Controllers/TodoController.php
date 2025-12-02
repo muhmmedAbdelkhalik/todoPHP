@@ -32,9 +32,9 @@ class TodoController extends Controller
 
         // Apply search filter
         if ($search) {
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -47,7 +47,7 @@ class TodoController extends Controller
         $allowedSortColumns = ['created_at', 'updated_at', 'title', 'status'];
         $sortBy = in_array($sortBy, $allowedSortColumns) ? $sortBy : 'created_at';
         $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
-        
+
         $todos = $query->orderBy($sortBy, $sortOrder)
             ->paginate($limit, ['*'], 'page', $page);
 
@@ -92,26 +92,39 @@ class TodoController extends Controller
         $this->todoService->delete($todo);
         return apiResponse(null, 'Todo deleted successfully.', true, 200);
     }
+
     /**
-     * Demonstrates a performance issue: N+1 query.
+     * Demonstrates missing null check leading to possible error.
      *
      * @return JsonResponse
      */
-    public function nPlusOneExample(): JsonResponse
+    public function missingNullCheckExample(): JsonResponse
     {
-        // Assume each Todo has an associated User (creator)
-        $todos = \App\Models\Todo::all();
+        // Let's say a Todo may not have a user assigned (user_id is nullable or user was deleted)
+        $todo = \App\Models\Todo::first();
 
-        $result = [];
-        foreach ($todos as $todo) {
-            // This will cause a query per todo if 'user' is not eager loaded (N+1)
-            $result[] = [
-                'id' => $todo->id,
-                'title' => $todo->title,
-                'user_name' => $todo->user ? $todo->user->name : null,
-            ];
-        }
+        // CRITICAL: Missing null check
+        // This will throw an error if $todo is null (e.g., no todos in database)
+        $userName = $todo->user->name;
 
-        return apiResponse($result, 'Todos with user names (N+1 query issue present).');
+        return apiResponse(
+            ['user_name' => $userName],
+            'Username for the first todo (missing null check)'
+        );
     }
-} 
+
+    /**
+     * Demonstrates potential SQL injection vulnerability.
+     *
+     * @return JsonResponse
+     */
+    public function sqlInjectionExample(Request $request): JsonResponse
+    {
+        // Let's say we're building a search endpoint
+        $search = $request->input('search', '');
+        $todos = \App\Models\Todo::where('title', 'like', "%{$search}%")->get();
+
+        return apiResponse($todos, 'Todos fetched successfully.');
+    }
+
+}
