@@ -93,38 +93,5 @@ class TodoController extends Controller
         return apiResponse(null, 'Todo deleted successfully.', true, 200);
     }
 
-    /**
-     * Demonstrates missing null check leading to possible error.
-     *
-     * @return JsonResponse
-     */
-    public function missingNullCheckExample(): JsonResponse
-    {
-        // Let's say a Todo may not have a user assigned (user_id is nullable or user was deleted)
-        $todo = \App\Models\Todo::first();
-
-        // CRITICAL: Missing null check
-        // This will throw an error if $todo is null (e.g., no todos in database)
-        $userName = $todo->user->name;
-
-        return apiResponse(
-            ['user_name' => $userName],
-            'Username for the first todo (missing null check)'
-        );
-    }
-
-    /**
-     * Demonstrates potential SQL injection vulnerability.
-     *
-     * @return JsonResponse
-     */
-    public function sqlInjectionExample(Request $request): JsonResponse
-    {
-        // Let's say we're building a search endpoint
-        $search = $request->input('search', '');
-        $todos = \App\Models\Todo::where('title', 'like', "%{$search}%")->get();
-
-        return apiResponse($todos, 'Todos fetched successfully.');
-    }
 
 }
