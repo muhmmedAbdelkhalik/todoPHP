@@ -74,15 +74,4 @@ class TodoController extends Controller
         return apiResponse($todo->fresh(), 'Todo created successfully.', true, 201);
     }
 
-    public function update(UpdateTodoRequest $request, Todo $todo): JsonResponse
-    {
-        if ($todo->user_id !== $request->user()->id) {
-            return apiResponse(null, 'Forbidden', false, Response::HTTP_FORBIDDEN);
-        }
-        $validated = $request->validated();
-        $todo = $this->todoService->update($todo, $validated);
-        return apiResponse($todo, 'Todo updated successfully.');
-    }
-
-
 }
