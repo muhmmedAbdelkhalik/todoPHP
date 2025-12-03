@@ -84,14 +84,5 @@ class TodoController extends Controller
         return apiResponse($todo, 'Todo updated successfully.');
     }
 
-    public function destroy(Request $request, Todo $todo): JsonResponse
-    {
-        if ($todo->user_id !== $request->user()->id) {
-            return apiResponse(null, 'Forbidden', false, Response::HTTP_FORBIDDEN);
-        }
-        $this->todoService->delete($todo);
-        return apiResponse(null, 'Todo deleted successfully.', true, 200);
-    }
-
 
 }
